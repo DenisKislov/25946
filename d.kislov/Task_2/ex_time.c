@@ -2,45 +2,58 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include <string.h>
 
 extern char *tzname[];
 
-int main(void) {
+int main(int argc, char *argv[]) {
     time_t now;
     struct tm *sp;
 
-    // 1. Получаем текущее календарное время в секундах с Epoch (1 января 1970)
-    (void) time(&now);
+    // По умолчанию Калифорния, либо город/пояс, переданный аргументом
+    const char *tz_val = (argc > 1) ? argv[1] : "PST8PDT";
 
-    // 2. Печатаем локальное время системы по умолчанию
+    // Выделяем память в куче под строку окружения "TZ=...",
+    // так как putenv требует, чтобы строка существовала всё время работы
+    size_t env_len = strlen(tz_val) + 4; // "TZ=" + значение + '\0'
+    char *tz_env = malloc(env_len);
+    if (!tz_env) {
+        perror("malloc failed");
+        return EXIT_FAILURE;
+    }
+    snprintf(tz_env, env_len, "TZ=%s", tz_val);
+
+    // 1. Текущее системное время
+    (void) time(&now);
     printf("Default time:    %s", ctime(&now));
 
-    // 3. Устанавливаем часовой пояс Калифорнии (Pacific Standard / Daylight Time)
-    // putenv помещает указатель на строку напрямую в окружение процесса
-    if (putenv("TZ=PST8PDT") != 0) {
+    // 2. Установка нового TZ
+    if (putenv(tz_env) != 0) {
         perror("putenv failed");
+        free(tz_env);
         return EXIT_FAILURE;
     }
 
-    // 4. Инициализируем данные о часовом поясе
+    // 3. Обновление системных таблиц часовых поясов
     tzset();
 
-    // 5. Преобразуем время с учётом нового значения TZ
+    // 4. Локализация времени под новый пояс
     sp = localtime(&now);
     if (sp == NULL) {
         perror("localtime failed");
         return EXIT_FAILURE;
     }
 
-    // 6. Форматированный вывод времени в Калифорнии
-    printf("California time: %d/%d/%02d %d:%02d:%02d %s\n",
-           sp->tm_mon + 1,        // tm_mon считается от 0 до 11
-           sp->tm_mday,           // день месяца (1-31)
-           sp->tm_year % 100,     // две последние цифры года (tm_year считается с 1900)
-           sp->tm_hour,           // часы (0-23)
-           sp->tm_min,            // минуты (0-59)
-           sp->tm_sec,            // секунды (0-59)
-           tzname[sp->tm_isdst]); // название пояса (PST или PDT)
+    // 5. Вывод времени для запрошенного города
+    printf("Time in %-8s %d/%d/%02d %d:%02d:%02d %s\n",
+           tz_val,
+           sp->tm_mon + 1,
+           sp->tm_mday,
+           sp->tm_year % 100,
+           sp->tm_hour,
+           sp->tm_min,
+           sp->tm_sec,
+           tzname[sp->tm_isdst]);
 
     return EXIT_SUCCESS;
 }
