@@ -7,7 +7,7 @@ typedef struct Node {
     struct Node *next;
 } Node;
 
-// Функция для чтения строки произвольной длины символ за символом
+// Функция чтения динамической строки произвольной длины
 char *read_dynamic_line(void) {
     size_t capacity = 32;
     size_t length = 0;
@@ -19,6 +19,11 @@ char *read_dynamic_line(void) {
 
     int c;
     while ((c = getchar()) != EOF && c != '\n') {
+        // Игнорируем символ возврата каретки '\r', если терминал его передает
+        if (c == '\r') {
+            continue;
+        }
+
         if (length + 1 >= capacity) {
             capacity *= 2;
             char *new_buf = realloc(buffer, capacity);
@@ -32,6 +37,7 @@ char *read_dynamic_line(void) {
         buffer[length++] = (char)c;
     }
 
+    // Если достигнут конец файла (EOF) и ничего не было введено
     if (c == EOF && length == 0) {
         free(buffer);
         return NULL;
@@ -43,9 +49,9 @@ char *read_dynamic_line(void) {
 
 int main(void) {
     Node *head = NULL;
-    Node *tail = NULL;
 
-    printf("Enter strings (start a line with '.' to stop):\n");
+    printf("Enter strings (type '.' on a new line to stop):\n");
+    fflush(stdout);
 
     while (1) {
         char *line = read_dynamic_line();
@@ -53,8 +59,9 @@ int main(void) {
             break;
         }
 
-        // Условие остановки: строка начинается с точки
-        if (line[0] == '.') {
+        // Проверка условия остановки:
+        // Строка либо строго равна ".", либо начинается с точки
+        if (strcmp(line, ".") == 0 || line[0] == '.') {
             free(line);
             break;
         }
@@ -66,25 +73,21 @@ int main(void) {
             exit(EXIT_FAILURE);
         }
         new_node->str = line;
-        new_node->next = NULL;
 
-        if (!head) {
-            head = new_node;
-            tail = new_node;
-        } else {
-            tail->next = new_node;
-            tail = new_node;
-        }
+        // Вставка в НАЧАЛО списка (для обратного порядка вывода)
+        new_node->next = head;
+        head = new_node;
     }
 
-    printf("\n--- Resulting list of lines ---\n");
+    printf("\n--- Resulting list of lines (reversed order) ---\n");
     Node *curr = head;
     while (curr) {
         printf("%s\n", curr->str);
         curr = curr->next;
     }
+    fflush(stdout);
 
-    // Освобождение памяти
+    // Освобождение динамической памяти
     curr = head;
     while (curr) {
         Node *temp = curr;
